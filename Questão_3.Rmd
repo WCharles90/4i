@@ -1,0 +1,490 @@
+---
+title: "Questão 3"
+author: "Wellington Charles Lacerda Nobrega"
+date: "17/04/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+## Limpeza dos Dados
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+
+
+# limpar o cachê
+rm(list = ls())
+
+# configuração de exibição de decimais
+options(digits = "2", scipen = 99) 
+
+# Opção para lidar com a Unidade Primária de Amostragem
+options(survey.lonely.psu = "adjust")
+
+# definição do diretório do arquivo a ser lido
+path_pnad <- paste0(getwd(),"/pnad.csv")
+
+# Carregando os Pacotes Necessários
+ip <- installed.packages()
+for (i in c("tidyverse","readxl", "ggplot2", "stargazer","xtable", "gridExtra", "knitr")){
+  if ( !(i %in% ip) ) { install.packages(i) }
+  if (i=="Quandl") { library(i, character.only = T) ; Quandl.auth("WP2rt8HsRo3kjWsRkLY5") } 
+  else library(i, character.only = T)
+}
+rm(list=c("ip","i"))
+
+# lendo os dados e coloando o path por segurança
+pnad <- read.csv(path_pnad, sep = ",")
+
+# Limpando a base de dados
+dados <- pnad %>%   
+  # retirando as pessoas que nasceram no dia 99
+  filter(V2008 != 99) %>% 
+  # identificando o domicílio 
+  unite(col = "domicilio", c(UPA,V1008,V1014), sep = "-", remove = TRUE) %>%
+  # criando uma coluna de data de nascimento
+  unite(col = "data_nascimento", c(V2008,V20081,V20082), sep = "-", remove = TRUE) %>% 
+  # criando uma variável indivíduo
+  unite(col = "individuo", c(domicilio,data_nascimento,V2007,Ano), sep = "-", remove = FALSE) %>%
+  # criando uma variável para denotar os gêmeos
+  mutate(gemeos = ifelse(duplicated(individuo) | duplicated(individuo, fromLast = TRUE), 1,0)) %>%
+  # retirando os gêmeos
+  filter(gemeos != 1) %>% select(-gemeos)
+  
+
+# removendo a base não filtrada da memória do R
+rm(pnad)
+```
+
+
+## 1. Análise das Pessoas Ocupadas
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+# selecionando os grupos que vou utilizar de acordo com o solicitado 2020
+ocupados_2019 <- dados %>% filter(Ano == 2019 & VD4002 == 1)
+ocupados_2020 <- dados %>% filter(Ano == 2020 & VD4002 == 1)
+
+# número de pessoas ocupadas em 2019 e 2020
+o19 <- ocupados_2019 %>% group_by(Ano, VD4002) %>% summarise(n())
+o20 <- ocupados_2020 %>% group_by(Ano, VD4002) %>% summarise(n())
+
+# número de pessoas na força de trabalho em 2019 e 2020
+f19 <- dados %>% filter(Ano==2019, VD4001==1) %>% group_by(Ano) %>% summarise(n())
+f20 <- dados %>% filter(Ano==2020, VD4001==1) %>% group_by(Ano) %>% summarise(n())     
+
+tab1 <- cbind(
+  rbind( "Taxa de Desocupação (%)" = (1 - (o19$`n()`/f19$`n()`))*100, "Nº ocupados "= o19$`n()`, "Força de Trabalho" = f19$`n()`), 
+  rbind( "Taxa de Desocupação (%)" = (1 - (o20$`n()`/f20$`n()`))*100, "Nº ocupados "= o20$`n()`,"Força de Trabalho" = f20$`n()`),
+  rbind( "VAR% 19/20" =  100*((1 - (o20$`n()`/f20$`n()`))*100 - (1 - (o19$`n()`/f19$`n()`))*100 ) / ((1 - (o19$`n()`/f19$`n()`))*100),
+         "VAR% pop.des. 19/20" = ((o20$`n()`- o19$`n()`)/(o19$`n()`))*100, "VAR% for.tra.19/20" = ((f20$`n()` - f19$`n()`) / f19$`n()`)*100))
+
+colnames(tab1) <- c("2019", "2020", "VAR%")  
+
+# removendo objetos que não serão mais usados
+rm(o19,o20,f19,f20)
+
+# visualização dos resultados
+knitr::kable(tab1, caption = "Taxa de Desocupação, Número de Ocupados e Força de Trabalho")
+
+```
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+horas <- dados %>% filter(VD4001==1) %>% group_by(Ano) %>% summarise("media_horas_habitual"=mean(VD4031,na.rm=TRUE),
+"media_horas_efetiva"=mean(VD4035,na.rm=TRUE))
+
+
+horas <- data.frame(horas)
+knitr::kable(horas, aling = T, caption = "Média de Horas trabalhadas (Habitual e Efetiva)")
+```
+
+
+#### Análise da Idade das Pessoas Ocupadas
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE, fig.cap = "Pirâmide demográfica dos indivíduos ocupados", fig.align='center'}
+
+# idade dos ocupados
+idade     <- dados %>% filter(VD4002 == 1) %>% select(Ano,V2009,V2007) 
+idade2019 <- ocupados_2019 %>% select(V2009,V2007) 
+idade2020 <- ocupados_2019 %>% select(V2009,V2007) 
+
+# sexo dos ocupados
+gen2019 <- ocupados_2019 %>% group_by(V2007) %>% summarise(n())
+gen2020 <- ocupados_2020 %>% group_by(V2007) %>% summarise(n())
+
+
+# plotando a pirâmide populacional por gênero dos ocupados 2019/2020
+
+labs <- c(paste(seq(0, 85, by = 5), seq(0 + 5 - 1, 90 - 1, by = 5),
+                sep = "-"), paste(90, "+", sep = ""))
+
+idade     <- dados %>% filter(VD4002 == 1) %>% mutate(V2007  = if_else(V2007 == 1,"Homem", "Mulher")) %>% select(Ano,V2009,V2007)
+idade$GrupoEtario <- cut(idade$V2009,breaks = c(seq(0, 90, by = 5), Inf), labels = labs, right = FALSE)
+idade <- idade %>% group_by(Ano, V2007, GrupoEtario) %>% summarise("total"=n()) %>%
+  mutate(sinal = ifelse(V2007 == "Homem",1,-1)) %>% mutate(total2 = total*sinal)
+
+plot1 <- grid.arrange(
+ggplot(idade, aes(x = GrupoEtario, y = total2, fill = V2007)) +
+  ggtitle("Demografia dos Ocupados 2019") + 
+  labs(y = "Milhares") +
+geom_bar(data = subset(idade, Ano == 2019 & V2007 == "Homem"),stat= "identity") +
+geom_bar(data = subset(idade, Ano == 2019 & V2007 == "Mulher"), stat= "identity") +
+scale_y_continuous(breaks = seq(-15000, 15000, 1000),  
+labels = paste0(as.character(c(15:0, 1:15)), "")) +
+scale_fill_brewer(palette = "Set1") + coord_flip() +
+theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+legend.background = element_rect(fill=NA),
+legend.position=c(0.85,0.9),
+legend.key = element_rect(fill = "white", colour = "white"))
+,
+ggplot(idade, aes(x = GrupoEtario, y = total2, fill = V2007)) +
+  ggtitle("Demografia dos Ocupados 2020") + 
+  labs(y = "Milhares") +
+  geom_bar(data = subset(idade, Ano == 2020 & V2007 == "Homem"),stat= "identity") +
+  geom_bar(data = subset(idade, Ano == 2020 & V2007 == "Mulher"), stat= "identity") +
+  scale_y_continuous(breaks = seq(-15000, 15000, 1000),  
+                     labels = paste0(as.character(c(15:0, 1:15)), "")) +
+  scale_fill_brewer(palette = "Set1") + 
+  coord_flip() +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.position=c(0.85,0.9),
+        legend.key = element_rect(fill = "white", colour = "white"))
+, ncol = 2)
+```
+
+
+```{r, echo = FALSE, message = FALSE}  
+# salvando esse plot
+#ggsave(
+#  "plot1.pdf",
+#  plot = plot1,
+#  scale = 1,
+#  width = 25,
+#  height = 12.5,
+#  units = "cm",
+#  dpi = 300
+#)
+  
+```
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+# analisando a relação entre faixa etária e população ocupada
+
+idade     <- dados %>% filter(VD4002 == 1) %>% mutate(V2007  = if_else(V2007 == 1,"Homem", "Mulher")) %>% select(Ano,V2009,V2007)
+idade$GrupoEtario <- cut(idade$V2009,breaks = c(seq(0, 90, by = 5), Inf), labels = labs, right = FALSE)
+idade <- idade %>% group_by(Ano, V2007, GrupoEtario) %>% summarise("total"=n())
+
+perh19 <- idade %>% filter(Ano == 2019, V2007 == "Homem") %>%
+           mutate( pp = (total/sum(total)*100))
+perh20 <- idade %>% filter(Ano == 2020, V2007 == "Homem") %>%
+  mutate( pp = (total/sum(total)*100))
+perm19 <- idade %>% filter(Ano == 2019, V2007 == "Mulher") %>%
+  mutate( pp = (total/sum(total)*100))
+perm20 <- idade %>% filter(Ano == 2020, V2007 == "Mulher") %>%
+  mutate( pp = (total/sum(total)*100))
+  
+
+labs1 <- c(paste(seq(10, 85, by = 5), seq(10 + 5 - 1, 90 - 1, by = 5),
+                sep = "-"), paste(90, "+", sep = ""))
+
+part_ocupada19  <- cbind("Faixa Etária"=labs1,"% homem 19" = round(perh19$pp,2), "% mulher 19" = round(perm19$pp),2)
+part_ocupada20  <- cbind("Faixa Etária"=labs1,"% homem 20" = round(perh20$pp,2), "% mulher 20" = round(perm20$pp),2) 
+  
+
+tab2 <- cbind("Faixa Etária"=labs1,"% homem 19" = round(perh19$pp,2), "% mulher 19" = round(perm19$pp,2), "% homem 20" = round(perh20$pp,2), "% mulher 20" = round(perm20$pp,2)) 
+
+
+# visualização
+knitr::kable(tab2, caption = "Participação (%) por Gênero e Idade na População Ocupada")
+
+
+```
+
+```{r, echo=FALSE}
+# removendo os objetos que não utilizaremos mais
+rm(perh19,perm19,perh20,perm20,part_ocupada19,part_ocupada20,horas,idade,idade2019,idade2020,gen2019,gen2020, ocupados_2019,ocupados_2020)
+```
+
+#### Análise da Escolaridade das Pessoas Ocupadas
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+
+labs2 <- c("Sem_Instrução","Fund_Incom", "Fund_Comp","Médio_Incom","Médio_Comp","Sup_Incom","Sup_Comp")
+
+# analisando a relação entre faixa etária e população ocupada
+escolaridade_2019 <- dados %>% filter(VD4002 == 1 & Ano == 2019) %>% group_by(Ano, VD3004) %>% summarise(n())
+escolaridade_2020 <- dados %>% filter(VD4002 == 1 & Ano == 2020) %>% group_by(Ano, VD3004) %>% summarise(n())
+
+
+# criando uma tabela para apresentar os resultados
+tab3 <-cbind(
+"Nível" = labs2,
+"Nº- 2019" = escolaridade_2019$`n()`,   
+"% - 2019"= round((escolaridade_2019$`n()`/sum(escolaridade_2019$`n()`))*100,2),
+"Nº - 2020" = escolaridade_2020$`n()`,   
+"% - 2020"= round((escolaridade_2020$`n()`/sum(escolaridade_2020$`n()`)*100),2)
+)
+
+
+
+# visualização
+knitr::kable(tab3, aling = T, caption = "Escolaridade da População Ocupada (Total e %)")
+```
+
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE, fig.cap = "Distribuição da Escolaridade dos Ocupados", fig.align='center'}
+
+escolaridade <- dados %>% filter(VD4002 == 1) %>% group_by(Ano, VD3004) %>% summarise("total"=n())
+escolaridade$Nivel <- cut(escolaridade$VD3004,breaks = c(seq(1,7 , by = 1), Inf), labels = labs2, right = FALSE)
+
+
+plot2 <- ggplot(escolaridade, aes(x = Nivel, y = total, fill = factor(Ano))) +
+  ggtitle("Distribuição da Escolaridade dos Ocupados") + 
+  labs(y = "", x = "") +
+  geom_bar(stat= "identity",position = position_dodge()) +
+  #geom_bar(data = subset(escolaridade, Ano == 2019), stat= "identity",position = position_dodge()) +
+  #geom_bar(data = subset(escolaridade, Ano == 2020), stat= "identity") +
+  theme(panel.background = element_rect(fill = "white"),
+        legend.background = element_rect(fill=NA),
+        legend.position=c(0.85,0.9),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+  geom_text(aes(label=total), position=position_dodge(width=0.9), vjust=-0.25) +
+    scale_fill_brewer(palette = "Set1")
+
+
+
+
+plot2
+
+```
+
+
+
+```{r, echo = FALSE, message = FALSE}  
+# salvando esse plot
+#ggsave(
+#  "plot2.pdf",
+#  plot = plot2,
+#  scale = 1,
+#  width = 25,
+#  height = 12.5,
+#  units = "cm",
+#  dpi = 300
+#)
+
+rm(escolaridade,escolaridade_2019,escolaridade_2020)
+
+```
+
+#### Distribuição da População Ocupada de Acordo com a Cor ou Raça
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+# analisando a relação entre faixa etária e população ocupada
+raca_2019 <-  dados %>% filter(VD4002 == 1 & Ano == 2019) %>% group_by(Ano, V2010) %>% summarise("total19"=n())
+raca_2020 <- dados %>% filter(VD4002 == 1 & Ano == 2020) %>% group_by(Ano, V2010) %>% summarise("total20"=n())
+labs3 <- c("branca", "preta", "amarela", "parda", "indigena", "ignorado")
+
+# criando uma tabela para apresentar os resultados
+tab4 <-cbind(
+  "Nível" = labs3,
+  "Nº- 2019" = raca_2019$total19,   
+  "% - 2019"= 100*((raca_2019$total19)/(sum(raca_2019$total19))),
+  "Nº - 2020" = raca_2020$total20,   
+  "% - 2020"= ((raca_2020$total20)/(sum(raca_2020$total20)))*100
+               )
+
+
+# visualização
+knitr::kable(tab4, aling = c, digits = 2, caption = "Distribuição da População Ocupada de Acordo com Cor ou Raça (Total e %)")
+
+```
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE, fig.cap="Distribuição por Raça da População Ocupada", fig.align='center'}
+raca <- dados %>% filter(VD4002 == 1) %>% group_by(Ano, V2010) %>% summarise("total"=n())
+raca$factor <- cut(raca$V2010,breaks = c(seq(1,6, by = 1), Inf), labels = labs3, right = FALSE)
+
+plot3 <- ggplot(raca, aes(x = factor, y = total, fill = factor(Ano))) +
+  ggtitle("Distribuição por Raça da População Ocupada") + 
+  labs(y = "", x = "") +
+  geom_bar(stat= "identity",position = position_dodge()) +
+  #geom_bar(data = subset(escolaridade, Ano == 2019), stat= "identity",position = position_dodge()) +
+  #geom_bar(data = subset(escolaridade, Ano == 2020), stat= "identity") +
+  theme(panel.background = element_rect(fill = "white"),
+        legend.background = element_rect(fill=NA),
+        legend.position=c(0.85,0.9),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+  geom_text(aes(label=total), position=position_dodge(width=0.9), vjust=-0.25) +
+    scale_fill_brewer(palette = "Set1")
+
+plot3
+```
+
+
+```{r, echo = FALSE, message = FALSE}  
+#ggsave(
+#  "plot3.pdf",
+#  plot = plot3,
+#  scale = 1,
+#  width = 25,
+#  height = 12.5,
+#  units = "cm",
+#  dpi = 300
+#)
+rm(raca,raca_2019,raca_2020)
+```
+
+
+
+#### Análise da Renda Média (Habitual e Efetiva)
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE, fig.cap="Renda Média dos Ocupados (Habitual e Efetiva)", fig.align='center'}
+renda <- dados %>% filter(VD4001==1) %>% group_by(Ano) %>% summarise("renda_media_efetiva"=mean(VD4020,na.rm=TRUE),
+"renda_media_habitual"=mean(VD4019,na.rm=TRUE))
+
+renda$fator <- c("A","B")
+
+
+plot4 <- grid.arrange(
+ggplot(renda) + 
+  geom_bar(aes(y = renda_media_efetiva,  x = factor(Ano), fill=factor(Ano)),stat="identity",position = position_dodge()) +
+  geom_text(aes(label=round(renda_media_efetiva,0), x = factor(Ano), y=renda_media_efetiva), position=position_dodge(width=0.9), vjust=-0.25) +
+  theme(legend.position="none",
+        panel.background = element_rect(fill = "white")) +
+     labs(y = "R$", x = "Renda Média Efetiva")+  scale_fill_brewer(palette = "Set1")
+,
+ggplot(renda) +  
+geom_bar(aes(y = renda_media_habitual,  x = factor(Ano), fill=factor(Ano)), stat="identity",position = position_dodge()) + 
+  geom_text(aes(label=round(renda_media_habitual,0), x = factor(Ano), y=renda_media_habitual), position=position_dodge(width=0.9), vjust=-0.25) +
+  theme(legend.position="none",
+        panel.background = element_rect(fill = "white")) +
+   labs(y = "", x = "Renda Média Habitual") +  scale_fill_brewer(palette = "Set1")
+, ncol = 2)
+
+plot4
+  
+renda <- renda %>% select(-fator)
+knitr::kable(renda, caption = "Renda Média Habitual e Efetiva da População Ocupada (2019 e 2020)")
+```
+
+
+```{r, echo = FALSE, message = FALSE}  
+#ggsave(
+#  "plot4.pdf",
+#  plot = plot4,
+#  scale = 1,
+#  width = 25,
+#  height = 12.5,
+#  units = "cm",
+#  dpi = 300
+#)
+
+rm(renda)
+```
+
+
+## 2. Análise da Renda População Ocupada, com Redução de Jornada e Afastada
+
+Aqui, vamos considerar como regra de bolso que a pessoa está ocupada com jornada reduzida se as horas efetivamente trabalhadas são ao menos 25\% menores que as horas habitualmente trabalhadas.
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+
+# Ocupados com redução de jornada 2019
+reducao <- dados %>% filter(VD4002 == 1 & VD4035 < 0.75*VD4031)
+
+# Ocupados, mas temporariamente afastados de seu trabalho.
+afastados <- dados %>% filter(Ano == 2020 & VD4002 == 1 & V4005 == 1)
+
+# Ocupados (para comparação)
+ocupados <- dados %>% filter(Ano == 2019 & VD4002 == 1)
+
+o19 <- dados %>% filter(Ano == 2019 & VD4002 == 1) %>% 
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+o20 <- dados %>% filter(Ano == 2020 & VD4002 == 1) %>%
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+
+or19 <- reducao %>% filter(Ano == 2019 & VD4002 == 1) %>% 
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+or20 <- reducao %>% filter(Ano == 2020 & VD4002 == 1) %>%
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+
+oa19 <- afastados %>% filter(Ano == 2019 & VD4002 == 1 & V4005 == 1) %>% 
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+
+# observa-se que não existem pessoas ocupadas e afastadas no ano de 2019, de acordo com nosso critério de filtragem.
+oa19$total
+
+oa20 <- afastados %>% filter(Ano == 2020 & VD4002 == 1 & V4005 == 1) %>%
+  group_by(Ano, VD4002) %>% summarise("total"=n())
+
+tab5 <-cbind(
+rbind("Pop.Ocupada(2019)" = o19$total,
+             "Pop.Ocupada (2020)" = o20$total,
+             "Var.19_20"= ((o20$total-o19$total)/(o19$total))*100), 
+rbind("Jornada.Reduzida(2019)" = or19$total,
+             "Jornada.Reduzida(2020)" = or20$total,
+             "Var.19_20"= ((or20$total-or19$total)/(or19$total))*100),
+rbind("Afastados(2019)" = 0,
+          "Afastados(2020)" = oa20$total,
+          "Var.19_20"= 0)
+)
+colnames(tab5) <- c("Pop. Ocupada", "Jornada Reduzida", "Afastados")
+row.names(tab5) <- c("Ano 2019","Ano 2020","Var.19_20")
+
+
+# visualização dos resultados
+knitr::kable(tab5, caption = "Comparativo entre Pop. Ocupada, com Jornada Resumida e Afastada")
+
+```
+
+```{r, echo = FALSE}
+rm(oa19,oa20,or19,or20,o19,o20)
+```
+
+
+```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
+
+# filtrando os dados por população ocupada, renda, reduzidos e afastados
+
+renda_ocupados <- dados %>% filter(VD4001==1) %>% group_by(Ano) %>% summarise("renda_efe_ocu"=mean(VD4020,na.rm=TRUE),
+"renda_hab_ocu"=mean(VD4019,na.rm=TRUE))
+
+renda_reduzidos <- reducao %>% filter(VD4001==1) %>% group_by(Ano) %>% summarise("renda_efe_red"=mean(VD4020,na.rm=TRUE),
+"renda_hab_red"=mean(VD4019,na.rm=TRUE))
+
+renda_afastados <- afastados %>% filter(VD4001==1) %>% group_by(Ano) %>% summarise("renda_efe_afa"=mean(VD4020,na.rm=TRUE),
+"renda_hab_afa"=mean(VD4019,na.rm=TRUE))
+
+
+# observa-se que não existem pessoas ocupadas & afastadas no ano de 2019, de acordo com nosso critério de filtragem.
+renda_afastados$Ano; renda_afastados$Ano
+
+# Filtrando a renda efetiva dos grupos selecionados
+efetiva <- rbind(
+ rbind(renda_ocupados$renda_efe_ocu),
+ rbind(renda_reduzidos$renda_efe_red),
+ cbind(0,renda_afastados$renda_efe_afa))
+
+colnames(efetiva) <- c("2019","2020")
+row.names(efetiva) <- c("Pop.Ocupada","Jornada Reduzida", "Afastados")
+
+# visualização dos resultados
+knitr::kable(efetiva, caption = "Renda Média Efetiva das Populações Ocupada, Com Jornada Reduzida e Afastada")
+
+
+# Filtrando a renda habitual dos grupos selecionados
+habitual <- rbind(
+ rbind(renda_ocupados$renda_hab_ocu),
+ rbind(renda_reduzidos$renda_hab_red),
+ cbind(0,renda_afastados$renda_hab_afa))
+
+colnames(habitual) <- c("2019","2020")
+row.names(habitual) <- c("Pop. Ocupada","Jornada Reduzida", "Afastados")
+
+
+
+knitr::kable(habitual, caption = "Renda Média Habitual das Populações Ocupada, Com Jornada Reduzida e Afastada")
+
+```
+
+

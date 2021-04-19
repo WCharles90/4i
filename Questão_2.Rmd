@@ -1,0 +1,454 @@
+---
+title: "Questão 2"
+author: "Wellington Charles Lacerda Nobrega"
+date: "18/04/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, message = FALSE}
+# limpar o cachê
+rm(list = ls())
+
+# configuração de exibição de decimais
+options(digits = "2", scipen = 99) 
+
+# Carregando os Pacotes Necessários
+ip <- installed.packages()
+for (i in c("tidyverse","readxl", "ggplot2", "stargazer","sidrar", "gridExtra", "knitr",
+            "BETS")){
+  if ( !(i %in% ip) ) { install.packages(i) }
+  if (i=="Quandl") { library(i, character.only = T) ; Quandl.auth("WP2rt8HsRo3kjWsRkLY5") } 
+  else library(i, character.only = T)
+}
+rm(list=c("ip","i"))
+
+
+# importar os dados que eu salvei em outro R-Script para agilizar e assegurar que as APi estejam ok
+
+# 6442 	Índice e variação da receita nominal e do volume de serviços (2014 = 100)
+PMS1 <- readRDS("PMS1.rds")
+  
+# 6445 Índice e variação da receita nominal e do volume das atividades turísticas (2014 = 100)
+PMS2 <- readRDS("PMS2.rds")
+
+# Índices de volume e de receita nominal de vendas de materiais de construção, por tipos de índice (2014 = 100)
+PMC1 <- readRDS("PMC1.rds")
+
+# 3418 Índices de volume e de receita nominal de vendas no comércio varejista, por tipos de índice e atividades (2014 = 100)
+
+PMC2 <- readRDS("PMC2.rds")
+
+# 3653 	Produção Física Industrial, por seções e atividades industriais
+PIM <-  readRDS("PIM.rds")
+
+# extraindo séries do BCB/SGS
+precos_acum <- readRDS("precos_acum.rds")
+
+governo <- readRDS("governo.rds") 
+
+
+# Numeração dos estados
+norte    <- c(12,16,13,15,11,14,17)
+nordeste <- c(27,29,23,21,25,26,22,24,28)
+coeste   <- c(52,51,50,53)
+sudeste  <- c(32,31,33,35)
+sul      <- c(41,42,43)
+
+
+
+# manipulando os dados para obter as informações desejadas
+
+# Receita e Volume do Setor de Serviço
+
+receita_serviços_NE <- PMS1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% nordeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_serviços_NO <- PMS1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% norte) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_serviços_CO <- PMS1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% coeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_serviços_S <- PMS1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sul) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_serviços_SDE <- PMS1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sudeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+# Receita e Volume da Atividade Turística
+
+receita_turismo_NE <- PMS2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% nordeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_turismo_NO <- PMS2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% norte) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_turismo_S <- PMS2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sul) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_turismo_SDE <- PMS2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sudeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+receita_turismo_CO <- PMS2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% coeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+# PMC
+
+# Comércio 3415
+vr_construcao_NE <- PMC1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% nordeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+vr_construcao_NO <- PMC1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% norte) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+vr_construcao_S <- PMC1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sul) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+vr_construcao_CO <- PMC1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% coeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+vr_construcao_SDE <- PMC1 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, Variável, Valor) %>% filter(`Tipos de índice (Código)`==40311 & `Unidade da Federação (Código)` %in% sudeste) %>% group_by(`Mês (Código)`,Variável) %>% summarise("Valor"=mean(Valor)) %>% spread(Variável, Valor)
+
+
+# PMC
+
+atividades <- c("Combustíveis e lubrificantes", "Hipermercados, supermercados, produtos alimentícios, bebidas e fumo", "Tecidos, vestuário e calçados", "Móveis e eletrodomésticos", "Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos", "Equipamentos e materiais para escritório, informática e comunicação")
+
+pmc_NE <- PMC2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, `Variável (Código)`, Atividades, Valor) %>% filter(`Tipos de índice (Código)`== 40311 & `Unidade da Federação (Código)` %in% nordeste & Atividades %in% atividades & `Variável (Código)`==564) %>% group_by(`Mês (Código)`, `Variável (Código)`, Atividades) %>% summarise("Valor"=mean(Valor)) %>% unite("para_simplificar",`Variável (Código)`, Atividades, remove=TRUE) %>% spread(para_simplificar, Valor)
+
+pmc_NO <- PMC2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, `Variável (Código)`, Atividades, Valor) %>% filter(`Tipos de índice (Código)`== 40311 & `Unidade da Federação (Código)` %in% norte & Atividades %in% atividades & `Variável (Código)`==564) %>% group_by(`Mês (Código)`, `Variável (Código)`, Atividades) %>% summarise("Valor"=mean(Valor)) %>% unite("para_simplificar",`Variável (Código)`, Atividades, remove=TRUE) %>% spread(para_simplificar, Valor)
+  
+pmc_S <- PMC2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, `Variável (Código)`, Atividades, Valor) %>% filter(`Tipos de índice (Código)`== 40311 & `Unidade da Federação (Código)` %in% sul & Atividades %in% atividades & `Variável (Código)`==564) %>% group_by(`Mês (Código)`, `Variável (Código)`, Atividades) %>% summarise("Valor"=mean(Valor)) %>% unite("para_simplificar",`Variável (Código)`, Atividades, remove=TRUE) %>% spread(para_simplificar, Valor)
+
+pmc_CO <- PMC2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, `Variável (Código)`, Atividades, Valor) %>% filter(`Tipos de índice (Código)`== 40311 & `Unidade da Federação (Código)` %in% coeste & Atividades %in% atividades & `Variável (Código)`==564) %>% group_by(`Mês (Código)`, `Variável (Código)`, Atividades) %>% summarise("Valor"=mean(Valor)) %>% unite("para_simplificar",`Variável (Código)`, Atividades, remove=TRUE) %>% spread(para_simplificar, Valor)
+
+pmc_SDE <- PMC2 %>% select(`Unidade da Federação (Código)`, `Tipos de índice (Código)`, `Mês (Código)`, `Variável (Código)`, Atividades, Valor) %>% filter(`Tipos de índice (Código)`== 40311 & `Unidade da Federação (Código)` %in% sudeste & Atividades %in% atividades & `Variável (Código)`==564) %>% group_by(`Mês (Código)`, `Variável (Código)`, Atividades) %>% summarise("Valor"=mean(Valor)) %>% unite("para_simplificar",`Variável (Código)`, Atividades, remove=TRUE) %>% spread(para_simplificar, Valor)
+
+
+# 
+atividades2 <- c("1 Indústria geral", "2 Indústrias extrativas", "3 Indústrias de transformação")
+pim_NE <- PIM %>% select(`Unidade da Federação (Código)`, `Seções e atividades industriais (CNAE 2.0) (Código)`, `Mês (Código)`, `Seções e atividades industriais (CNAE 2.0)`,`Variável (Código)`, Variável, Valor) %>% filter(`Variável (Código)`== 3135 & `Seções e atividades industriais (CNAE 2.0)` %in% atividades2 & `Unidade da Federação (Código)` %in% nordeste) %>% group_by(`Mês (Código)`,`Seções e atividades industriais (CNAE 2.0)`) %>% summarise("Valor"=mean(Valor,na.rm=TRUE)) %>% spread(`Seções e atividades industriais (CNAE 2.0)`, Valor)
+
+pim_NO <- PIM %>% select(`Unidade da Federação (Código)`, `Seções e atividades industriais (CNAE 2.0) (Código)`, `Mês (Código)`, `Seções e atividades industriais (CNAE 2.0)`,`Variável (Código)`, Variável, Valor) %>% filter(`Variável (Código)`== 3135 & `Seções e atividades industriais (CNAE 2.0)` %in% atividades2 & `Unidade da Federação (Código)` %in% norte) %>% group_by(`Mês (Código)`,`Seções e atividades industriais (CNAE 2.0)`) %>% summarise("Valor"=mean(Valor,na.rm=TRUE)) %>% spread(`Seções e atividades industriais (CNAE 2.0)`, Valor)
+
+pim_S <- PIM %>% select(`Unidade da Federação (Código)`, `Seções e atividades industriais (CNAE 2.0) (Código)`, `Mês (Código)`, `Seções e atividades industriais (CNAE 2.0)`,`Variável (Código)`, Variável, Valor) %>% filter(`Variável (Código)`== 3135 & `Seções e atividades industriais (CNAE 2.0)` %in% atividades2 & `Unidade da Federação (Código)` %in% sul) %>% group_by(`Mês (Código)`,`Seções e atividades industriais (CNAE 2.0)`) %>% summarise("Valor"=mean(Valor,na.rm=TRUE)) %>% spread(`Seções e atividades industriais (CNAE 2.0)`, Valor)
+
+pim_SDE <- PIM %>% select(`Unidade da Federação (Código)`, `Seções e atividades industriais (CNAE 2.0) (Código)`, `Mês (Código)`, `Seções e atividades industriais (CNAE 2.0)`,`Variável (Código)`, Variável, Valor) %>% filter(`Variável (Código)`== 3135 & `Seções e atividades industriais (CNAE 2.0)` %in% atividades2 & `Unidade da Federação (Código)` %in% sudeste) %>% group_by(`Mês (Código)`,`Seções e atividades industriais (CNAE 2.0)`) %>% summarise("Valor"=mean(Valor,na.rm=TRUE)) %>% spread(`Seções e atividades industriais (CNAE 2.0)`, Valor)
+
+pim_CO <- PIM %>% select(`Unidade da Federação (Código)`, `Seções e atividades industriais (CNAE 2.0) (Código)`, `Mês (Código)`, `Seções e atividades industriais (CNAE 2.0)`,`Variável (Código)`, Variável, Valor) %>% filter(`Variável (Código)`== 3135 & `Seções e atividades industriais (CNAE 2.0)` %in% atividades2 & `Unidade da Federação (Código)` %in% coeste) %>% group_by(`Mês (Código)`,`Seções e atividades industriais (CNAE 2.0)`) %>% summarise("Valor"=mean(Valor,na.rm=TRUE)) %>% spread(`Seções e atividades industriais (CNAE 2.0)`, Valor)
+
+
+```
+
+
+A Figura 1 apresenta a evolução do índice de receita e do volume de serviços para as regiões brasileiras. É possível observar uma forte reversão em ambos os indicadores em março de 2020, em virtude da adoção de medidas de distanciamento social e restrição à circulação. À medida que tais medidas vão sendo flexibilizadas, os índices de volume de serviços passam a apresentar tendência de recuperação. Em relação a essas séries, destaca-se o distanciamento da Região Norte-Nordeste no que diz respeito ao valor do índice em relação às demais regiões do Brasil. Possivelmente, refletindo uma maior absorção do choque restritivo sobre as atividades de serviços dessa região, que possui um polo têxtil relevante. 
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Evolução da Receita e do Volume do Setor de Serviços para as Regiões do Brasil", fig.align='center'}
+
+data <- seq(as.Date("2020/01/01"), by = "month", length.out = length(receita_serviços_NE$`Mês (Código)`))
+
+grid.arrange(
+ggplot(data = receita_serviços_NE, aes(x = data, y = `Índice de receita nominal de serviços`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = receita_serviços_CO, aes(x = data, y = `Índice de receita nominal de serviços`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = receita_serviços_S, aes(x = data, y = `Índice de receita nominal de serviços`, colour = "Sul"),size=0.750) +
+geom_line(data = receita_serviços_SDE, aes(x = data, y = `Índice de receita nominal de serviços`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 8),
+        legend.position= c(0.85,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE.")  +
+    ggtitle("Receita nominal de serviços")  + 
+    geom_vline(xintercept = as.Date("2020-03-01"), size=0.2, colour="gray", linetype = 2)+
+      geom_vline(xintercept = as.Date("2020-12-01"), size=0.2, colour="gray", linetype = 2),
+ggplot(data = receita_serviços_NE, aes(x = data, y = `Índice de volume de serviços`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = receita_serviços_CO, aes(x = data, y = `Índice de volume de serviços`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = receita_serviços_S, aes(x = data, y = `Índice de volume de serviços`, colour = "Sul"),size=0.750) +
+geom_line(data = receita_serviços_SDE, aes(x = data, y = `Índice de volume de serviços`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 8),
+        legend.position= c(0.85,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE.")  +
+    ggtitle("Volume de serviços")  +
+  geom_vline(xintercept = as.Date("2020-03-01"), size=0.2, colour="gray", linetype = 2)+
+  geom_vline(xintercept = as.Date("2020-12-01"), size=0.2, colour="gray", linetype = 2), 
+ncol = 2) 
+
+```
+
+A incerteza no que diz respeito à duração do período de \textit{lockdown}, bem como as condições de rendimento futuro, afetam as expectativas dos consumidores, que em alguns casos optam por postergar o consumo de produtos não-essenciais para períodos menos turbulentos. Esse comportamento pode ser corroborado ao se analisar a Figura 2, onde é apresentado a evolução do índice de volume de serviços distribuído por setores da atividade de serviço. Dois pontos merecem destaque: Primeiro, o volume de serviços relacionados aos setores farmacêutico e de supermercados/alimentícios mantiveram seus respectivos índices de volumes de serviços praticamente os mesmo em todas as regiões do Brasil. Esse fato pode ser explicado pelas características inerentemente essenciais dos itens comercializados em tais estabelecimentos comerciais, que mesmo em momentos de retração da atividade econômica e redução da mobilidade possuem caráter inelástico em sua demanda. Segundo, percebe-se que o setor têxtil mostra uma queda aparentemente superior às respostas média das demais atividades. Isto pode estar relacionada ao nível de essencialidade dos itens comercializados por esse ramo da atividade econômica associada as medidas de redução da mobilidade. Na medida em que se relaxa essa última, a atividade desse setor volta a crescer com pico sazonal no mês de Dezembro/2020. Os ramos de combustíveis, Material de escritório e de móveis compartilham trajetória semelhantes. 
+
+
+De forma geral, para 2021 espera-se novamente um arrefecimento dos setores mais sensíveis às medidas de distanciamento social, em virtude da adoção de um novo período de \textit{lockdown} em Março de 2021 em praticamente todo o país. Contudo, a experiência vivida em 2020 forçou diversos ramos da atividade a aderirem de forma unilateral a uma “digitalização” de sua atividade comercial. Este fato deve reduzir em algum grau o impacto de tais medidas sobre o volume de serviços desses setores. Contudo, é importante destacar que o aumento do desemprego repercute negativamente no rendimento da população, o que por sua vez ajuda a explicar a queda observada de - 4,1\% no Produto Interno no ano de 2020, de acordo com o IBGE. A adoção de novas medidas de restrição à circulação e o ritmo lento no processo de vacinação contra a covid-19 são fatores que contribuem para a crença de fraco (ou nulo) crescimento econômico para o ano de 2021.
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=8, message = FALSE, fig.cap = "Evolução do Volume de Serviços, por Atividades de Serviços para as Regiões do Brasil", fig.align='center'}
+
+
+p1 <- ggplot(data = pmc_NE, aes(x = data, y = pmc_NE$`564_Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos`, colour = "Farmacêuticos")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(aes(x = data, y = pmc_NE$`564_Combustíveis e lubrificantes`, colour = "Combustíveis"),size=0.750) +
+geom_line(aes(x = data, y = pmc_NE$`564_Equipamentos e materiais para escritório, informática e comunicação` , colour = "Material-Escritório"),size=0.750) +
+geom_line(aes(x = data, y = pmc_NE$`564_Hipermercados, supermercados, produtos alimentícios, bebidas e fumo`, colour = "Supermercados"),size=0.750) + 
+geom_line(aes(x = data, y = pmc_NE$`564_Móveis e eletrodomésticos`, colour = "Móveis"),size=0.750) + 
+geom_line(aes(x = data, y = pmc_NE$`564_Tecidos, vestuário e calçados`, colour = "Têxtil"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 9),
+        legend.position= c(0.775,0.17),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE")  +
+    ggtitle("Volume de Serviços, por Atividades de Serviços (Norte-Nordeste)")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2) +            guides(col = guide_legend(ncol=2))
+  
+p3 <- ggplot(data = pmc_S, aes(x = data, y = `564_Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos`, colour = "Farmacêuticos")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(aes(x = data, y = `564_Combustíveis e lubrificantes`, colour = "Combustíveis"),size=0.750) +
+geom_line(aes(x = data, y = `564_Equipamentos e materiais para escritório, informática e comunicação` , colour = "Material-Escritório"),size=0.750) +
+geom_line(aes(x = data, y = `564_Hipermercados, supermercados, produtos alimentícios, bebidas e fumo`, colour = "Supermercados"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Móveis e eletrodomésticos`, colour = "Móveis"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Tecidos, vestuário e calçados`, colour = "Têxtil"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 9),
+        legend.position= c(0.775,0.17),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE")  +
+    ggtitle("Volume de Serviços, por Atividades de Serviços (Sul)")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2)+            guides(col = guide_legend(ncol=2))
+
+  
+p4 <- ggplot(data = pmc_SDE, aes(x = data, y = `564_Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos`, colour = "Farmacêuticos")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(aes(x = data, y = `564_Combustíveis e lubrificantes`, colour = "Combustíveis"),size=0.750) +
+geom_line(aes(x = data, y = `564_Equipamentos e materiais para escritório, informática e comunicação` , colour = "Material-Escritório"),size=0.750) +
+geom_line(aes(x = data, y = `564_Hipermercados, supermercados, produtos alimentícios, bebidas e fumo`, colour = "Supermercados"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Móveis e eletrodomésticos`, colour = "Móveis"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Tecidos, vestuário e calçados`, colour = "Têxtil"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 9),
+        legend.position= c(0.775,0.17),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE")  +
+    ggtitle("Volume de Serviços, por Atividades de Serviços (Sudeste)")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2)+            guides(col = guide_legend(ncol=2))
+
+
+p5 <- ggplot(data = pmc_CO, aes(x = data, y = `564_Artigos farmacêuticos, médicos, ortopédicos, de perfumaria e cosméticos`, colour = "Farmacêuticos")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(aes(x = data, y = `564_Combustíveis e lubrificantes`, colour = "Combustíveis"),size=0.750) +
+geom_line(aes(x = data, y = `564_Equipamentos e materiais para escritório, informática e comunicação` , colour = "Material-Escritório"),size=0.750) +
+geom_line(aes(x = data, y = `564_Hipermercados, supermercados, produtos alimentícios, bebidas e fumo`, colour = "Supermercados"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Móveis e eletrodomésticos`, colour = "Móveis"),size=0.750) + 
+geom_line(aes(x = data, y = `564_Tecidos, vestuário e calçados`, colour = "Têxtil"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 9),
+        legend.position= c(0.775,0.17),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE")  +
+    ggtitle("Volume de Serviços, por Atividades de Serviços (Centro-Oeste)")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2)+            guides(col = guide_legend(ncol=2))
+
+
+
+
+grid.arrange(p1,p3,p4,p5, nrow = 2)
+
+
+```
+
+Através da Figura 3, é possível se observar que setor de serviços relacionados à atividade turística não passou incólume pelas medidas de distanciamento social. Tanto o índice de receita quanto o de volume, apresentaram forte queda com vale entre os meses de março e abril (conforme grifado no gráfico). Cabe destacar que a atividade turística é responsável por milhares de empregos em todo o Brasil, em sua grande maioria (principalmente na Região Norte-Nordeste) composta por atividades autônomas. Para o ano de 2021, espera-se que as novas medidas de \textit{lockdown} e receio em relação à doença prejudiquem a trajetória de recuperação desse setor.
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Evolução da Receita e do Volume da Atividade de Turismo para as Regiões do Brasil", fig.align='center'}
+
+
+grid.arrange(
+ggplot(data = receita_turismo_NE, aes(x = data, y = `Índice de receita nominal das atividades turísticas`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = receita_turismo_CO, aes(x = data, y = `Índice de receita nominal das atividades turísticas`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = receita_turismo_S, aes(x = data, y = `Índice de receita nominal das atividades turísticas`, colour = "Sul"),size=0.750) +
+geom_line(data = receita_turismo_SDE, aes(x = data, y = `Índice de receita nominal das atividades turísticas`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.875,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE.")  +
+    ggtitle("Receita nominal das atividades turísticas")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2),
+ggplot(data = receita_turismo_NE, aes(x = data, y = `Índice de volume das atividades turísticas`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = receita_turismo_CO, aes(x = data, y = `Índice de volume das atividades turísticas`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = receita_turismo_S, aes(x = data, y = `Índice de volume das atividades turísticas`, colour = "Sul"),size=0.750) +
+geom_line(data = receita_turismo_SDE, aes(x = data, y = `Índice de volume das atividades turísticas`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.875,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMS, IBGE.")  +
+    ggtitle("Volume das atividades turísticas")  +
+  geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2),
+ncol = 2) 
+
+
+```
+
+
+
+
+
+
+
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Evolução da Produção Física Industrial para as Regiões do Brasil", fig.align='center'}
+
+
+# p1 <- ggplot(data = pim_NE, aes(x = data, y = `1 Indústria geral`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+#geom_line(data = pim_CO, aes(x = data, y = `1 Indústria geral`, colour = "Centro-Oeste"),size=0.750) +
+#geom_line(data = pim_S, aes(x = data, y = `1 Indústria geral`, colour = "Sul"),size=0.750) +
+#geom_line(data = pim_SDE, aes(x = data, y = `1 Indústria geral`, colour = "Sudeste"),size=0.750) + 
+#  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+#        legend.background = element_rect(fill=NA),
+#        legend.title = element_blank(),
+#        legend.text = element_text(color = "black", size = 10),
+#        legend.position= c(0.85,0.17),
+#        legend.key = element_rect(fill = "white", colour = "white")) +
+#        labs(x = "Mês/Ano", y = "Índice")  +
+#    ggtitle("Produção Física da Indústria geral")  + 
+#    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2)
+
+
+p2 <- ggplot(data = pim_NE, aes(x = data, y = `2 Indústrias extrativas`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = pim_CO, aes(x = data, y = `2 Indústrias extrativas`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = pim_S, aes(x = data, y = `2 Indústrias extrativas`, colour = "Sul"),size=0.750) +
+geom_line(data = pim_SDE, aes(x = data, y = `2 Indústrias extrativas`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= "none",
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "", subtitle = "Fonte: PIM, IBGE.")  +
+    ggtitle("Produção Física das Indústrias extrativas")  +
+  geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2) 
+   
+  
+p3 <- ggplot(data = pim_NE, aes(x = data, y = `3 Indústrias de transformação`, 
+                              colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = pim_CO, aes(x = data, y = `3 Indústrias de transformação`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = pim_S, aes(x = data, y = `3 Indústrias de transformação`, colour = "Sul"),size=0.750) +
+geom_line(data = pim_SDE, aes(x = data, y = `3 Indústrias de transformação`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.75,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "", subtitle = "Fonte: PIM, IBGE.")  +
+    ggtitle("Produção Física das Indústrias de transformação")  +
+  geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2)
+
+
+
+grid.arrange(p2,p3,ncol = 2)
+
+
+```
+
+
+Ao analisarmos a Figura 04, nota-se respostas relativamente diferentes entre os setores da atividade industrial. A produção física na indústria extrativa aparentemente não sofreu influência da recessão causada pelo coronavírus. Por outro lado, com a produção física das indústrias de transformação foi diferente. De forma geral, pode-se subdividir a indústria de transformação em indústria de base e bens de consumo. O primeiro mais relacionado a transformação de uma \textit{commoditie} (aço, milho, etc.)  ou matéria-prima no intuito de servir a outras firmas. O segundo sub-ramo está relacionado a produção de produção de bens destinados ao consumo final das famílias. A resposta negativa desse setor no ano de 2020, assim como as demais atividades econômicas se deveu à paralização da produção e em virtude das medidas contra a covid-19. Contudo, a recuperação apresentada (com destaque para a região centro-oeste) para níveis acima do patamar anterior podem estar relacionadas as medidas de assistência realizadas pelo governo federal, que em algum grau possivelmente refletiram em um estímulo direto à demanda por bens de consumo. 
+
+Diferentemente dos demais setores da atividade, o setor relacionado a materiais de construção apresentou, após um breve arrefecimento, forte aumento tanto no índice de volume quanto no índice de volume de vendas. Aqui, novamente a teoria econômica pode ajudar a entender a resposta desse setor. De forma geral, qualquer governo pode se valer da política fiscal e monetária para atuar diretamente sobre a economia. Em períodos de recessão, tais políticas podem assumir um papel anticíclico. Nesse sentido, o governo brasileiro forneceu o auxílio emergencial e reduziu (por diversos motivos) a taxa de juros ao menor nível da série histórica, 2\%. Este último fato reduziu o custo associado ao financiamento de imóveis, que aumentou a demanda por novos empreendimentos e repercutiu sobre o índice de volume de vendas do setor de materiais de construção. Para o ano de 2021, espera-se (em algum grau) o arrefecimento de tal setor, visto que o Copom iniciou uma reversão na tendência de queda da Selic, que atualmente se encontra 2,75\%. Estimativas de mercado preveem a Selic em 5\%  até o final de 2021.
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Evolução da Receita e do Volume de Vendas de Materias de Construção para as Regiões do Brasil", fig.align='center'}
+
+
+grid.arrange(
+ggplot(data = vr_construcao_NE, aes(x = data, y = `Índice de receita nominal de vendas de materiais de construção`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = vr_construcao_CO, aes(x = data, y = `Índice de receita nominal de vendas de materiais de construção`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = vr_construcao_S, aes(x = data, y = `Índice de receita nominal de vendas de materiais de construção`, colour = "Sul"),size=0.750) +
+geom_line(data = vr_construcao_SDE, aes(x = data, y = `Índice de receita nominal de vendas de materiais de construção`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.85,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMC, IBGE.")  +
+    ggtitle("Receita nominal de vendas de Materiais de Construção")  + 
+    geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2),
+ggplot(data = vr_construcao_NE, aes(x = data, y = `Índice de volume de vendas de materiais de construção`, colour = "Norte-Nordeste")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+geom_line(data = vr_construcao_CO, aes(x = data, y = `Índice de volume de vendas de materiais de construção`, colour = "Centro-Oeste"),size=0.750) +
+geom_line(data = vr_construcao_S, aes(x = data, y = `Índice de volume de vendas de materiais de construção`, colour = "Sul"),size=0.750) +
+geom_line(data = vr_construcao_SDE, aes(x = data, y = `Índice de volume de vendas de materiais de construção`, colour = "Sudeste"),size=0.750) + 
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.85,0.2),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "Índice", subtitle = "Fonte: PMC, IBGE.")  +
+    ggtitle("Volume de vendas de Materiais de Construção")  +
+  geom_vline(xintercept = as.Date("2020-04-01"), size=0.2, colour="black", linetype = 2),
+ncol = 2) 
+
+```
+
+A Figura 6 apresenta a trajetória do IPCA versus Selic (esquerda) e a evolução do IGP-M e do índice de preços ao consumidor (direita). A evolução desses indicadores é extremamente relevante, pois é bastante informativo a respeito das condições de vida da camada mais pobre da população. O índice de preços ao consumidor amplo (IPCA) apresentou valor de cerca de 4,5\% em 2020, acima da meta de 3,75\% estabelecida pela autoridade monetária. Em março de 2021, esse indicador já registra 6,10\% nos últimos 12 meses. Tal cenário alerta para o agravamento do processo inflacionário, pois mostra aceleração do indicador oficial associado a uma taxa de juros não tão responsiva (princípio de Taylor). O controle inflacionário é uma das principais atribuições do BACEN e deve ser tratado com rigor, pois o processo de corrosão do poder de compra da moeda é especialmente danoso as camadas mais carentes da população. A população carente, é duplamente afetada tanto pela redução da renda causada pela pandemia e aumento do desemprego quanto pela corrosão do poder aquisitivo da moeda, visto que a maior parte da renda desses é destinada a compra de itens básicos a subsistência. Essa situação é evidenciada quando analisamos o IGP-M e o IPC. Esses indicadores apresentaram forte aceleração ao longo de 2020, chegando a ultrapassar os 25\% ao ano (em ambos os casos). Em conjunto, o IGP-M e índice de preços ao produtor também alertam para um agravamento do processo inflacionário. Assim, espera-se uma elevação da taxa Selic no ano de 2021, o que pode afetar o nível/volume dos setores da economia, em virtude do caráter restritivo dessa medida.
+
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Evolução do IPCA, Selic, IGP-M e do Índice de Preços ao Consumidor, Acumulado nos últimos 12 meses", fig.align='center'}
+
+grid.arrange(precos1 <- ggplot(data = precos_acum, aes(x = data, y = ts_433, colour = "IPCA")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + geom_line(aes(x = data, y = ts_4390, colour = "Taxa Selic"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.875,0.85),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "% Acumulado nos últimos 12 meses", subtitle = "Fonte: SGS/BCB.")  +
+    ggtitle("Evolução do IPCA x Selic") ,
+precos2 <- ggplot(data = precos_acum, aes(x = data, y = ts_225, colour = "Produtor")) + geom_line(size=0.750) + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + geom_line(aes(x = data, y = ts_189, colour = "IGP-M"),size=0.750) +
+  theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+        legend.background = element_rect(fill=NA),
+        legend.title = element_blank(),
+        legend.text = element_text(color = "black", size = 10),
+        legend.position= c(0.11,0.85),
+        legend.key = element_rect(fill = "white", colour = "white")) +
+        labs(x = "Mês/Ano", y = "% Acumulado nos últimos 12 meses", subtitle = "Fonte: SGS/BCB.")  +
+    ggtitle("Evolução IGP-M  x Índice de Preços ao Produtor"), ncol = 2)
+
+```
+Por fim, a Figura 7 apresenta a evolução recente os principais indicadores da dívida pública. É possível observar que o ano de 2020 foi marcado por um forte aumento no endividamento público (estoque da dívida) e por uma piora significativa no resultado primário, com déficit primário na ordem de aproximadamente 10\% do PIB. Nesse sentido, intensificou-se o debate a respeito do cumprimento (ou relaxamento) da regra fiscal de gastos no orçamento de 2021. Esse cenário mostra que não há espaço para políticas fiscais expansionistas e também aponta para uma possível postura mais austera do governo nos próximos anos. Esse debate é importante pois pode afetar o nível de demanda agregada da economia e, consequentemente, a evolução do nível da atividade econômica nas regiões do Brasil.
+
+```{r, echo = FALSE, warning = FALSE, include = TRUE, fig.width=14, fig.height=4, message = FALSE, fig.cap = "Trajetória da Dívida Bruta, Dívida Líquida e do Resultado Primário", fig.align='center'}
+
+
+g1 <- ggplot(data = governo) + 
+geom_line(aes(x = data, y = ts_4503, colour="Dívida Líquida"),size=0.750) +
+geom_line(aes(x = data, y = ts_13762, colour="Dívida Bruta"),size=0.750) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  ggtitle("Trajetória de Dívida") +
+labs(x = "", y = "% Y", subtitle = "Fonte: SGS/BCB.") + 
+theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+legend.background = element_rect(fill=NA),
+plot.title = element_text(hjust = 0.5),
+legend.position=c(0.1,0.85),
+legend.title = element_blank(),
+legend.key = element_rect(fill = "white", colour = "white"))+
+  geom_vline(xintercept = as.Date("2020-03-01"), size=0.2, colour="black", linetype = 2)  
+g2 <- ggplot(data = governo) + 
+geom_line(aes(x = data, y = ts_5793, colour="Superávit Primário"),size=0.750) +
+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+geom_hline(yintercept = 0, size=0.2, colour="black", linetype = 2) + 
+labs(x = "", y = "% Y", subtitle = "Fonte: SGS/BCB." ) + 
+ggtitle("Superavit Primário") +
+theme(panel.background = element_rect(fill = "white", colour = "grey25"),
+legend.background = element_rect(fill=NA),
+plot.title = element_text(hjust = 0.5),
+legend.position=c(0.15,0.85),
+legend.title = element_blank(),
+legend.key = element_rect(fill = "white", colour = "white"))+
+    geom_vline(xintercept = as.Date("2020-03-01"), size=0.2, colour="black", linetype = 2)  
+
+
+grid.arrange(g1,g2,ncol=2)
+
+
+```
