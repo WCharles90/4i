@@ -20,9 +20,6 @@ options(digits = "2", scipen = 99)
 # Opção para lidar com a Unidade Primária de Amostragem
 options(survey.lonely.psu = "adjust")
 
-# definição do diretório do arquivo a ser lido
-path_pnad <- paste0(getwd(),"/pnad.csv")
-
 # Carregando os Pacotes Necessários
 ip <- installed.packages()
 for (i in c("tidyverse","readxl", "ggplot2", "stargazer","xtable", "gridExtra", "knitr")){
@@ -32,10 +29,12 @@ for (i in c("tidyverse","readxl", "ggplot2", "stargazer","xtable", "gridExtra", 
 }
 rm(list=c("ip","i"))
 
-# lendo os dados e coloando o path por segurança
-#pnad <- read.csv(path_pnad, sep = ",")
-# como o tamanho do pnad.csv excede o tamanho máximo do github, tive de salvar em RDS
-pnad <- readRDS("pnad.rds")
+
+# abrindo os dados enviados pela 4intelligence
+unzip("base_setorial.zip")
+
+# leitura dos dados da pnad
+pnad <- read.csv("base/pnad.csv", sep = ",")
 
 # Limpando a base de dados
 dados <- pnad %>%   
