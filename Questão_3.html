@@ -195,7 +195,9 @@ for (i in c(&quot;tidyverse&quot;,&quot;readxl&quot;, &quot;ggplot2&quot;, &quot
 rm(list=c(&quot;ip&quot;,&quot;i&quot;))
 
 # lendo os dados e coloando o path por segurança
-pnad &lt;- read.csv(path_pnad, sep = &quot;,&quot;)
+#pnad &lt;- read.csv(path_pnad, sep = &quot;,&quot;)
+# como o tamanho do pnad.csv excede o tamanho máximo do github, tive de salvar em RDS
+pnad &lt;- readRDS(&quot;pnad.rds&quot;)
 
 # Limpando a base de dados
 dados &lt;- pnad %&gt;%   

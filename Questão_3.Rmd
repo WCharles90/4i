@@ -11,8 +11,6 @@ output:
 ## Limpeza dos Dados
 
 ```{r, echo = TRUE, warning = FALSE, include = TRUE, message = FALSE}
-
-
 # limpar o cachê
 rm(list = ls())
 
@@ -35,7 +33,9 @@ for (i in c("tidyverse","readxl", "ggplot2", "stargazer","xtable", "gridExtra", 
 rm(list=c("ip","i"))
 
 # lendo os dados e coloando o path por segurança
-pnad <- read.csv(path_pnad, sep = ",")
+#pnad <- read.csv(path_pnad, sep = ",")
+# como o tamanho do pnad.csv excede o tamanho máximo do github, tive de salvar em RDS
+pnad <- readRDS("pnad.rds")
 
 # Limpando a base de dados
 dados <- pnad %>%   
